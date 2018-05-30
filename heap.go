@@ -2,7 +2,7 @@ package main
 
 
 type nodeDistance struct {
-	id       ID
+	id       string
 	distance float64
 }
 
@@ -25,7 +25,7 @@ func (h *nodeDistanceHeap) Pop() interface{} {
 	return lastNode
 }
 
-func (h *nodeDistanceHeap) updateDistance(id ID, val float64) {
+func (h *nodeDistanceHeap) updateDistance(id string, val float64) {
 	for i := 0; i < len(*h); i++ {
 		if (*h)[i].id == id {
 			(*h)[i].distance = val

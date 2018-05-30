@@ -8,13 +8,12 @@ import (
 
 type TrainLegs struct {
 	XMLName xml.Name `xml:"TrainLegs"`
-	//Trains map[string]Train `xml:"TrainLeg"`
+	//Trains map[string]train `xml:"TrainLeg"`
 	Trains []Train `xml:"TrainLeg"`
 }
 
-//func unmarshalTickets(byteValue []byte) (map[string]Train, error) {
+//func unmarshalTickets(byteValue []byte) (map[string]train, error) {
 func unmarshalTickets(byteValue []byte) ([]Train, error) {
-
 	var tl TrainLegs
 	err := xml.Unmarshal(byteValue, &tl)
 	if err != nil {
