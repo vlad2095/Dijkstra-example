@@ -7,8 +7,47 @@ import (
 	"time"
 )
 
+type Train struct {
+	ID                  string  `xml:"TrainId,attr"`
+	DepartureStationId  string  `xml:"DepartureStationId,attr"`
+	ArrivalStationId    string  `xml:"ArrivalStationId,attr"`
+	DepartureTimeString string  `xml:"DepartureTimeString,attr"`
+	ArrivalTimeString   string  `xml:"ArrivalTimeString,attr"`
+	Price               float64 `xml:"Price,attr"`
+	DepartureTime       time.Time
+	ArrivalTime         time.Time
+	Duration            time.Duration
+}
+
+func (t Train) String() string {
+	f := `№%s Dep.Station: %s Dep.Time: Day %d %s Arr.Station: %s Arr.Time: Day %d %s Price: %.2f$" Duration: %s`
+	return fmt.Sprintf(f, t.ID,
+		t.DepartureStationId, t.DepartureTime.Day(), t.DepartureTimeString,
+		t.ArrivalStationId, t.ArrivalTime.Day(), t.ArrivalTimeString,
+		t.Price, t.Duration.String())
+}
+
+const timeFormat = "15:04:05"
+
+// returns time between departion and arriving of the train
+func (t *Train) CalculateDuration() time.Duration {
+	return t.ArrivalTime.Sub(t.DepartureTime)
+}
+
+//ConvertTime convert time value from string to time.Time
+func (t *Train) ConvertTime() {
+	depTime, _ := time.Parse(timeFormat, t.DepartureTimeString)
+	arrTime, _ := time.Parse(timeFormat, t.ArrivalTimeString)
+	if !arrTime.After(depTime) {
+		arrTime = arrTime.Add(time.Hour * 24)
+	}
+	t.DepartureTime = depTime
+	t.ArrivalTime = arrTime
+	//
+	t.Duration = t.CalculateDuration()
+}
+
 func main() {
-	// Parse info from xml to graph
 	g := NewGraphFromXML("data.xml")
 	// find and output all paths fom all nodes
 	PrintAllRoutes(g)
@@ -68,8 +107,6 @@ func GetTrainsFromXML(filename string) []Train {
 	for _, train := range t {
 		// convert time from string to time.Time
 		train.ConvertTime()
-		// duration = arrival time - departure time
-		train.FindDuration()
 		trains = append(trains, train)
 	}
 	return trains
@@ -214,7 +251,7 @@ func Dijkstra(g *Graph, source, target string) ([]string, error) {
 	return path, nil
 }
 
-// recieves one or two edges
+// receive one or two edges
 // and returns relative weight
 func CalculateWeight(edge1, edge2 *Edge) float64 {
 	if edge2 == nil {
@@ -223,26 +260,29 @@ func CalculateWeight(edge1, edge2 *Edge) float64 {
 		return train.Price * float64(train.Duration)
 	}
 
+	// get value from train
 	train1 := edge1.data.(Train)
 	train2 := edge2.data.(Train)
 
-	// If second train outgoing before first comes (5 minute is min amount to be in time)
-	// Then add 24 hour to second one departure time
-	if !(train2.DepartureTime.After(train1.ArrivalTime.Add(5 * time.Minute))) {
+	// If second train outgoing before first comes, then next train will be tomorrow
+	// so add 24 hour to second one departure time
+
+	for !(train2.DepartureTime.After(train1.ArrivalTime)) {
 		train2.DepartureTime = train2.DepartureTime.Add(time.Hour * 24)
 		train2.ArrivalTime = train2.ArrivalTime.Add(time.Hour * 24)
 	}
 	totalCost := train1.Price + train2.Price
-	// total duration contains duration of train routes and time beetween them
-	totalDuration := train1.Duration + train2.Duration + train2.DepartureTime.Sub(train1.ArrivalTime)
+	// total duration contains duration of train routes and time between them
+	timeBetweenTrains := train2.DepartureTime.Sub(train1.ArrivalTime)
+	totalDuration := train1.Duration + train2.Duration + timeBetweenTrains
 	//	weight is a direct proportion of price and time
 	weight := totalCost * float64(totalDuration)
 	return weight
 }
 
-// BuildBetterRoute finds better possible route from given path
+// BuildRoute finds better possible route from given path
 // return trains list (slice), total cost and total duration of route
-func BuildBetterRoute(graph *Graph, path []string) (trains []*Train, totalCost float64, totalDuration time.Duration) {
+func BuildRoute(graph *Graph, path []string) (trains []*Train) {
 	pathLen := len(path)
 	if pathLen < 2 {
 		// there is no path
@@ -265,14 +305,14 @@ func BuildBetterRoute(graph *Graph, path []string) (trains []*Train, totalCost f
 	train := arc.edges[id].data.(Train)
 	trains = append(trains, &train)
 
-	totalCost += train.Price
-	totalDuration += train.Duration
+	//totalCost += train.Price
+	//totalDuration += train.Duration
 
 	if pathLen == 2 {
 		return
 	}
 
-	// set up previous edge and time  for calculations of weight in loop
+	// set up previous edge and time for calculations of weight in loop
 	previousEdge := arc.edges[id]
 	previousArrivalTime := train.ArrivalTime
 
@@ -292,16 +332,12 @@ func BuildBetterRoute(graph *Graph, path []string) (trains []*Train, totalCost f
 		}
 		// update train time
 		train := arc.edges[id].data.(Train)
-		if !(train.DepartureTime.After(previousArrivalTime.Add(5 * time.Minute))) {
+		for !(train.DepartureTime.After(previousArrivalTime.Add(5 * time.Minute))) {
 			train.DepartureTime = train.DepartureTime.Add(time.Hour * 24)
 			train.ArrivalTime = train.ArrivalTime.Add(time.Hour * 24)
 		}
 
-
-		totalCost += train.Price
-		totalDuration += (train.Duration + train.DepartureTime.Sub(previousArrivalTime))
 		trains = append(trains, &train)
-
 		//	 Update previous edge and time
 		previousEdge = arc.edges[id]
 		previousArrivalTime = train.ArrivalTime
@@ -327,11 +363,18 @@ func PrintAllRoutes(graph *Graph) {
 					continue
 				}
 				// prints all trains of path
-				route, cost, duration := BuildBetterRoute(graph, path)
+				route := BuildRoute(graph, path)
+
+				var routeCost float64
+
 				for _, train := range route {
 					fmt.Printf("%s\n", train.String())
+					routeCost += train.Price
 				}
-				fmt.Printf("Total Cost: %.2f$, Total Duration:  %s\n---\n", cost, duration)
+				// find total duration of the route
+				routeDuration := route[len(route)-1].ArrivalTime.Sub(route[0].DepartureTime)
+				// print cost and duration
+				fmt.Printf("Cost: %.2f$, Duration:  %s\n---\n", routeCost, routeDuration)
 			}
 		}
 	}

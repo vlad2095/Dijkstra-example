@@ -1,64 +1,27 @@
 package main
 
 import (
-	"fmt"
-	"time"
 	"bytes"
+	"fmt"
 )
 
-type Train struct {
-	ID                  string  `xml:"TrainId,attr"`
-	DepartureStationId  string  `xml:"DepartureStationId,attr"`
-	ArrivalStationId    string  `xml:"ArrivalStationId,attr"`
-	DepartureTimeString string  `xml:"DepartureTimeString,attr"`
-	ArrivalTimeString   string  `xml:"ArrivalTimeString,attr"`
-	Price               float64 `xml:"Price,attr"`
-	DepartureTime       time.Time
-	ArrivalTime         time.Time
-	Duration            time.Duration
-}
-
-func (t Train) String() string {
-	f := `№%s Dep.Station: %s Dep.Time: %s Arr.Station: %s Arr.Time: %s Price: %.2f$" Duration: %s`
-	return fmt.Sprintf(f, t.ID,
-		t.DepartureStationId, t.DepartureTimeString,
-		t.ArrivalStationId, t.ArrivalTimeString,
-		t.Price, t.Duration.String())
-}
-
-const timeFormat = "15:04:05"
-
-func (t *Train) FindDuration() {
-	t.Duration = t.ArrivalTime.Sub(t.DepartureTime)
-}
-
-func (t *Train) ConvertTime() {
-	depTime, _ := time.Parse(timeFormat, t.DepartureTimeString)
-	arrTime, _ := time.Parse(timeFormat, t.ArrivalTimeString)
-	if !arrTime.After(depTime) {
-		arrTime = arrTime.Add(time.Hour * 24)
-	}
-	t.DepartureTime = depTime
-	t.ArrivalTime = arrTime
-}
-
-// A Vertex represents a node in a directed multigraph.
+// A Vertex represents a node in a directed multi graph.
 type Vertex struct {
-	id         string
-	In         map[string]*Arc // map of ingoing arcs
-	Out        map[string]*Arc // map of outgoing arcs
+	id  string
+	In  map[string]*Arc // map of ingoing arcs
+	Out map[string]*Arc // map of outgoing arcs
 }
 
-func NewVertex(id string) *Vertex{
-	v := &Vertex{id:id,
-		In:make(map[string]*Arc),
-		Out:make(map[string]*Arc),
+func NewVertex(id string) *Vertex {
+	v := &Vertex{id: id,
+		In:  make(map[string]*Arc),
+		Out: make(map[string]*Arc),
 	}
 	return v
 }
 
-func(v *Vertex) AddIngoingArc(arc *Arc) error{
-	if _ , ok := v.In[arc.from]; !ok {
+func (v *Vertex) AddIngoingArc(arc *Arc) error {
+	if _, ok := v.In[arc.from]; !ok {
 		v.In[arc.from] = arc
 	} else {
 		return fmt.Errorf("arc <%s --> %s>  already exist in vertex <%s> ", arc.from, arc.to, v.id)
@@ -66,8 +29,8 @@ func(v *Vertex) AddIngoingArc(arc *Arc) error{
 	return nil
 }
 
-func(v *Vertex) AddOutgoingArc(arc *Arc) error{
-	if _ , ok := v.Out[arc.to]; !ok {
+func (v *Vertex) AddOutgoingArc(arc *Arc) error {
+	if _, ok := v.Out[arc.to]; !ok {
 		v.Out[arc.to] = arc
 	} else {
 		return fmt.Errorf("arc <%s --> %s>  already exist in vertex <%s> ", arc.from, arc.to, v.id)
@@ -75,37 +38,35 @@ func(v *Vertex) AddOutgoingArc(arc *Arc) error{
 	return nil
 }
 
-func(v *Vertex) GetIngoingArc(from string) (*Arc, bool) {
+func (v *Vertex) GetIngoingArc(from string) (*Arc, bool) {
 	arc, ok := v.In[from]
 	return arc, ok
 }
 
-func(v *Vertex) GetOutgoingArc(to string) (*Arc, bool) {
+func (v *Vertex) GetOutgoingArc(to string) (*Arc, bool) {
 	arc, ok := v.Out[to]
 	return arc, ok
 }
 
-
 // An Arc represents a parallel edges in the directed multi graph.
 type Arc struct {
-	from string
-	to string
+	from  string
+	to    string
 	edges map[string]*Edge
 }
 
-func NewArc(from ,to string) *Arc {
-	a := &Arc{from:from,
-		to:to,
+func NewArc(from, to string) *Arc {
+	a := &Arc{from: from,
+		to:    to,
 		edges: make(map[string]*Edge)}
 	return a
 }
 
-
 func (a *Arc) AddEdge(edge *Edge) error {
-	if _ , ok := a.edges[edge.id]; !ok {
+	if _, ok := a.edges[edge.id]; !ok {
 		a.edges[edge.id] = edge
 	} else {
-		return fmt.Errorf("edge <%s> already exist in arc <%s --> %s> ", edge.id, a.from,a.to)
+		return fmt.Errorf("edge <%s> already exist in arc <%s --> %s> ", edge.id, a.from, a.to)
 	}
 	return nil
 }
@@ -117,12 +78,12 @@ func (a *Arc) GetEdges() map[string]*Edge {
 // An Edge represents a single connection between two vertices
 // an Arc contains from one or more edges
 type Edge struct {
-	id string
+	id   string
 	data interface{}
 }
 
-func NewEdge(id string, data interface{})  *Edge {
-	return &Edge{id:id,data:data}
+func NewEdge(id string, data interface{}) *Edge {
+	return &Edge{id: id, data: data}
 }
 
 // Graph describes the methods of graph operations.
@@ -150,15 +111,15 @@ func (g *Graph) AddVertex(v *Vertex) error {
 // nil and false otherwise
 func (g *Graph) GetVertex(id string) (*Vertex, bool) {
 	v, ok := g.Vertices[id]
-	return v,ok
+	return v, ok
 }
 
 // returns all vertices
-func (g *Graph) GetVertices() (map[string]*Vertex) {
+func (g *Graph) GetVertices() map[string]*Vertex {
 	return g.Vertices
 }
 
-// converts all graph data into staing
+// converts all graph data into string
 func (g *Graph) String() string {
 	buf := new(bytes.Buffer)
 	// iterate over all vertices of graph
@@ -168,7 +129,7 @@ func (g *Graph) String() string {
 		for _, arc := range node.Out {
 			fmt.Fprintf(buf, "%s --- > %s\n", arc.from, arc.to)
 			// iterate over all edges of arc
-			for _,edge := range arc.edges {
+			for _, edge := range arc.edges {
 				fmt.Fprintf(buf, "%s ---- %v\n", edge.id, edge.data)
 			}
 		}
